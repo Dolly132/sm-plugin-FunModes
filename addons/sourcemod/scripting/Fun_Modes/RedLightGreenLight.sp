@@ -1,65 +1,115 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define FFADE_IN       (0x0001) // Fade in
-#define FFADE_OUT      (0x0002) // Fade out
-#define FFADE_MODULATE (0x0004) // Modulate (Don't blend)
-#define FFADE_STAYOUT  (0x0008) // Ignores the duration, stays faded out until a new fade message is received
-#define FFADE_PURGE    (0x0010) // Purges all other fades, replacing them with this one
+ModeInfo g_RLGLInfo;
+
+#undef THIS_MODE_INFO
+#define THIS_MODE_INFO g_RLGLInfo
+
+bool g_bEnableDetecting;
 
 char countDownPath[PLATFORM_MAX_PATH];
 
 float g_fOriginalSpeed[MAXPLAYERS + 1];
 
-ConVarInfo g_cvInfoRLGL[7] = 
-{
-    {null, "0.1,0.3,0.5,0.8", "float"},
-    {null, "2.0,5.0,10.0,15.0", "float"},
-    {null, "20.0,30.0,40.0,60.0", "float"},
-    {null, "25.0,35.0,55.0,65.0", "float"},
-    {null, "1.0,2.0,3.0,4.0,5.0", "float"},
-    {null, "3.0,5.0,8.0,10.0", "float"},
-    {null, "0.0,0.2,0.5,1.2,1.5,2.0", "float"}
-};
+/* Timers */
+Handle g_hRLGLTimer;
+Handle g_hRLGLDetectTimer;
+Handle g_hRLGLWarningTimer;
+
+#define RLGL_CONVAR_TIME_BETWEEN_DAMAGE 		0
+#define RLGL_CONVAR_FREEZE_TIME 				1
+#define RLGL_CONVAR_TIME_BETWEEN_REDLIGHTS_MIN	2
+#define RLGL_CONVAR_TIME_BETWEEN_REDLIGHTS_MAX	3
+#define RLGL_CONVAR_DAMAGE						4
+#define RLGL_CONVAR_WARNING_TIME				5
+#define RLGL_CONVAR_ZOMBIES_SPEED				6
+#define RLGL_CONVAR_COUNTDOWN_FOLDER			7
+#define RLGL_CONVAR_TOGGLE						8
 
 /* CALLED on Plugin Start */
-stock void PluginStart_RLGL()
+stock void OnPluginStart_RLGL()
 {
+	THIS_MODE_INFO.name = "RLGL";
+	THIS_MODE_INFO.tag = "{gold}[FunModes-RedLightGreenLight]{lightgreen}";
+
 	/* ADMIN COMMANDS */
-	RegAdminCmd("sm_fm_rlgl", Cmd_RLGL, ADMFLAG_CONVARS, "Enable/Disable RedLightGreenLight mode.");
+	RegAdminCmd("sm_fm_rlgl", Cmd_RLGLToggle, ADMFLAG_CONVARS, "Enable/Disable RedLightGreenLight mode.");
 
-	/* CONVARS HANDLES */
-	g_cvRLGLDetectTimer = CreateConVar("sm_rlgl_time_between_damage", "0.1", "The timer interval for player to detect their movement");
-	g_cvRLGLFinishDetectTime = CreateConVar("sm_rlgl_freeze_time", "5", "How many seconds the movement detection should be disabled after");
-	g_cvRLGLDetectTimerRepeatMin = CreateConVar("sm_rlgl_time_between_redlights_min", "20.0", "After how many seconds to keep repeating the redlights (MIN VALUE)");
-	g_cvRLGLDetectTimerRepeatMax = CreateConVar("sm_rlgl_time_between_redlights_max", "30.0", "After how many seconds to keep repeating the redlights (MAX VALUE, SET TO 0 to disable min/max)");
-	g_cvRLGLDamage = CreateConVar("sm_rlgl_damage", "5.0", "Damage to apply to the player that is moving while its a red light");
-	g_cvRLGLWarningTime = CreateConVar("sm_rlgl_warning_time", "8", "Time in seconds to warn the players before red light is on");
-	g_cvRLGLZombiesSpeed = CreateConVar("sm_rlgl_zombies_speed", "0.5", "Zombies speed during red light, if set to 0 then it is disabled");
-	g_cvCountdownFolder = CreateConVar("sm_rlgl_countdown_folder", "zr/countdown/$.mp3", "Countdown folder and the files that can be used for sound");
+	/* CONVARS */
+	DECLARE_FM_CVAR(
+		THIS_MODE_INFO.cvarInfo, RLGL_CONVAR_TIME_BETWEEN_DAMAGE, 
+		"sm_rlgl_time_between_damage", "0.1", "The timer interval for player to detect their movement",
+		("0.1,0.3,0.5,0.8"), "float"
+	);
+
+	DECLARE_FM_CVAR(
+		THIS_MODE_INFO.cvarInfo, RLGL_CONVAR_FREEZE_TIME, 
+		"sm_rlgl_freeze_time", "5.0", "How many seconds the movement detection should be disabled after",
+		("2.0,5.0,10.0,15.0"), "float"
+	);
 	
-	RLGL_SetCvarsInfo();
+	DECLARE_FM_CVAR(
+		THIS_MODE_INFO.cvarInfo, RLGL_CONVAR_TIME_BETWEEN_REDLIGHTS_MIN, 
+		"sm_rlgl_time_between_redlights_min", "20.0", "After how many seconds to keep repeating the redlights (MIN VALUE)",
+		("20.0,30.0,40.0,60.0"), "float"
+	);
+	
+	DECLARE_FM_CVAR(
+		THIS_MODE_INFO.cvarInfo, RLGL_CONVAR_TIME_BETWEEN_REDLIGHTS_MAX, 
+		"sm_rlgl_time_between_redlights_max", "30.0", "After how many seconds to keep repeating the redlights (MAX VALUE, SET TO 0 to disable min/max)",
+		("25.0,35.0,45.0,65.0"), "float"
+	);
+	
+	DECLARE_FM_CVAR(
+		THIS_MODE_INFO.cvarInfo, RLGL_CONVAR_DAMAGE,
+		"sm_rlgl_damage", "5.0", "Damage to apply to the player that is moving while its a red light",
+		("1.0,2.0,3.0,4.0,5.0"), "float"
+	);
+
+	DECLARE_FM_CVAR(
+		THIS_MODE_INFO.cvarInfo, RLGL_CONVAR_WARNING_TIME,
+		"sm_rlgl_warning_time", "8.0", "Time in seconds to warn the players before red light is on",
+		("5.0,8.0,10.0,15.0,20.0"), "float"
+	);
+
+	DECLARE_FM_CVAR(
+		THIS_MODE_INFO.cvarInfo, RLGL_CONVAR_ZOMBIES_SPEED,
+		"sm_rlgl_zombies_speed", "0.5", ("Zombies speed during red light, if set to 0 then it is disabled"),
+		("0.0,0.2,0.5,0.8,1.5,2.0"), "float"
+	);
+
+	DECLARE_FM_CVAR(
+		THIS_MODE_INFO.cvarInfo, RLGL_CONVAR_COUNTDOWN_FOLDER,
+		"sm_rlgl_countdown_folder", "zr/countdown/$.mp3", "Countdown folder and the files that can be used for sound",
+		"", ""
+	);
+
+	DECLARE_FM_CVAR(
+		THIS_MODE_INFO.cvarInfo, RLGL_CONVAR_TOGGLE,
+		"sm_rlgl_enable", "1", "Enable/Disable the RLGL Mode (This differes from turning it on/off)",
+		("0,1"), "bool"
+	);
+	
+	THIS_MODE_INFO.enableIndex = RLGL_CONVAR_TOGGLE;
+
+	THIS_MODE_INFO.index = g_iLastModeIndex++;
+	g_ModesInfo[THIS_MODE_INFO.index] = THIS_MODE_INFO;
+
+	THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_TOGGLE].cvar.AddChangeHook(OnRLGLModeToggle);	
 }
 
-void RLGL_SetCvarsInfo()
+void OnRLGLModeToggle(ConVar cvar, const char[] newValue, const char[] oldValue)
 {
-	ConVar cvars[sizeof(g_cvInfoRLGL)];
-	cvars[0] = g_cvRLGLDetectTimer;
-	cvars[1] = g_cvRLGLFinishDetectTime;
-	cvars[2] = g_cvRLGLDetectTimerRepeatMin;
-	cvars[3] = g_cvRLGLDetectTimerRepeatMax;
-	cvars[4] = g_cvRLGLDamage;
-	cvars[5] = g_cvRLGLWarningTime;
-	cvars[6] = g_cvRLGLZombiesSpeed;
-
-	for (int i = 0; i < sizeof(g_cvInfoRLGL); i++)
-		g_cvInfoRLGL[i].cvar = cvars[i];
+	if (THIS_MODE_INFO.isOn)
+		CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, cvar.BoolValue, THIS_MODE_INFO.index);
 }
 
-stock void MapStart_RLGL() {
-	g_cvCountdownFolder.GetString(countDownPath, sizeof(countDownPath));
+stock void OnMapStart_RLGL() 
+{
+	THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_COUNTDOWN_FOLDER].cvar.GetString(countDownPath, sizeof(countDownPath));
 	
-	for (int i = 1; i <= g_cvRLGLWarningTime.IntValue; i++)
+	for (int i = 1; i <= THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_WARNING_TIME].cvar.IntValue; i++)
 	{
 		char sndPath[PLATFORM_MAX_PATH];
 		strcopy(sndPath, sizeof(sndPath), countDownPath);
@@ -74,19 +124,31 @@ stock void MapStart_RLGL() {
 	}
 }
 
-stock void RoundStart_RLGL()
+stock void OnMapEnd_RLGL()
 {
-	delete g_hRLGLWarningTime;
-	delete g_hRLGLTimer;
-	delete g_hRLGLDetectTimer;
-	
-	if (g_bIsRLGLEnabled)
-		StartRLGLTimer();
+	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, false, THIS_MODE_INFO.index);
+
+	g_hRLGLTimer = null;
+	g_hRLGLDetectTimer = null;
+	g_hRLGLWarningTimer = null;
 }
 
-stock void RLGL_OnClientInfected(int client)
+stock void OnClientPutInServer_RLGL(int client)
 {
-	float speed = g_cvRLGLZombiesSpeed.FloatValue;
+	#pragma unused client
+}
+
+stock void OnClientDisconnect_RLGL(int client)
+{
+	g_fOriginalSpeed[client] = 0.0;
+}
+
+stock void ZR_OnClientInfected_RLGL(int client)
+{
+	if (!(THIS_MODE_INFO.isOn && g_bEnableDetecting))
+		return;
+
+	float speed = THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_ZOMBIES_SPEED].cvar.FloatValue;
 	if (speed <= 0.0)
 		return;
 
@@ -94,9 +156,30 @@ stock void RLGL_OnClientInfected(int client)
 	SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", speed);
 }
 
-stock void ClientDisconnect_RLGL(int client)
+stock void Event_RoundStart_RLGL()
 {
-	g_fOriginalSpeed[client] = 0.0;
+	delete g_hRLGLWarningTimer;
+	delete g_hRLGLTimer;
+	delete g_hRLGLDetectTimer;
+	
+	if (THIS_MODE_INFO.isOn)
+		StartRLGLTimer();
+}
+
+stock void Event_RoundEnd_RLGL() {}
+stock void Event_PlayerSpawn_RLGL(int client)
+{
+	#pragma unused client
+}
+
+stock void Event_PlayerTeam_RLGL(Event event)
+{
+	#pragma unused event
+}
+
+stock void Event_PlayerDeath_RLGL(int client)
+{
+	#pragma unused client
 }
 
 void ApplyFade(const char[] sColor)
@@ -157,15 +240,21 @@ void ApplyFade(const char[] sColor)
 	EndMessage();
 }
 
-Action Cmd_RLGL(int client, int args)
+public Action Cmd_RLGLToggle(int client, int args)
 {
-	g_bIsRLGLEnabled = !g_bIsRLGLEnabled;
-	CPrintToChatAll("%s Red Light Green Light is now {olive}%s{lightgreen}.", RLGL_Tag, (g_bIsRLGLEnabled) ? "Enabled" : "Disabled");
+	if (!THIS_MODE_INFO.cvarInfo[THIS_MODE_INFO.enableIndex].cvar.BoolValue)
+	{
+		CReplyToCommand(client, "%s RLGL mode is currently disabled!", THIS_MODE_INFO.tag);
+		return Plugin_Handled;
+	}
+
+	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
+	CPrintToChatAll("%s Red Light Green Light is now {olive}%s{lightgreen}.", THIS_MODE_INFO.tag, (THIS_MODE_INFO.isOn) ? "Enabled" : "Disabled");
 
 	delete g_hRLGLTimer;
 	delete g_hRLGLDetectTimer;
 
-	if (g_bIsRLGLEnabled)
+	if (THIS_MODE_INFO.isOn)
 	{
 		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
 		StartRLGLTimer();
@@ -176,10 +265,13 @@ Action Cmd_RLGL(int client, int args)
 
 Action RLGL_Timer(Handle timer)
 {
-	if (!g_bIsRLGLEnabled)
+	g_hRLGLTimer = null;
+	
+	if (!THIS_MODE_INFO.isOn)
 		return Plugin_Stop;
 
-	g_hRLGLWarningTime = CreateTimer(1.0, RLGL_Warning_Timer, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
+	delete g_hRLGLWarningTimer;
+	g_hRLGLWarningTimer = CreateTimer(1.0, RLGL_Warning_Timer, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
 	
 	StartRLGLTimer();
 	
@@ -188,12 +280,20 @@ Action RLGL_Timer(Handle timer)
 
 Action RLGL_Warning_Timer(Handle timer)
 {
+	if (!THIS_MODE_INFO.isOn)
+	{
+		g_hRLGLWarningTimer = null;
+		return Plugin_Stop;
+	}
+
 	static int timePassed;
 	char sMessage[256];
-	FormatEx(sMessage, sizeof(sMessage), "Warning: Red Light is coming in %d seconds, Do not move after that", (g_cvRLGLWarningTime.IntValue - timePassed));
+	FormatEx(sMessage, sizeof(sMessage), "Warning: Red Light is coming in %d seconds, Do not move after that", (THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_WARNING_TIME].cvar.IntValue - timePassed));
 	
+	int warningTime = THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_WARNING_TIME].cvar.IntValue;
+
 	char numStr[3];
-	IntToString(g_cvRLGLWarningTime.IntValue - timePassed, numStr, sizeof(numStr));
+	IntToString(warningTime - timePassed, numStr, sizeof(numStr));
 	
 	char sndPath[PLATFORM_MAX_PATH];
 	strcopy(sndPath, sizeof(sndPath), countDownPath);
@@ -217,21 +317,21 @@ Action RLGL_Warning_Timer(Handle timer)
 
 	timePassed++;
 
-	if (timePassed > g_cvRLGLWarningTime.IntValue)
+	if (timePassed > warningTime)
 	{
 		ApplyFade("Red");
 		g_bEnableDetecting = true;
-		float speed = g_cvRLGLZombiesSpeed.FloatValue;
+		float speed = THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_ZOMBIES_SPEED].cvar.FloatValue;
 		if (speed > 0.0) {
 			SetZombiesSpeed(speed);
 		}
 		
-		CreateTimer(g_cvRLGLFinishDetectTime.FloatValue, RLGL_Detect_Time_Timer, _, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_FREEZE_TIME].cvar.FloatValue, RLGL_Detect_Time_Timer, _, TIMER_FLAG_NO_MAPCHANGE);
 		timePassed = 0;
-		g_hRLGLWarningTime = null;
+		g_hRLGLWarningTimer = null;
 		
 		delete g_hRLGLDetectTimer;
-		g_hRLGLDetectTimer 	= CreateTimer(g_cvRLGLDetectTimer.FloatValue, RLGL_Detect_Timer, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
+		g_hRLGLDetectTimer 	= CreateTimer(THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_TIME_BETWEEN_DAMAGE].cvar.FloatValue, RLGL_Detect_Timer, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
 		
 		return Plugin_Stop;
 	}
@@ -241,14 +341,13 @@ Action RLGL_Warning_Timer(Handle timer)
 
 Action RLGL_Detect_Timer(Handle timer)
 {
-	if (!g_bIsRLGLEnabled || !g_bEnableDetecting)
+	if (!THIS_MODE_INFO.isOn || !g_bEnableDetecting)
 	{
 		g_hRLGLDetectTimer = null;
 		return Plugin_Stop;
 	}
 
-	char sMessage[256];
-	FormatEx(sMessage, sizeof(sMessage), "STOP MOVING ITS A RED LIGHT!!!");
+	float damage = THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_DAMAGE].cvar.FloatValue;
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_CT)
@@ -261,8 +360,8 @@ Action RLGL_Detect_Timer(Handle timer)
 		int buttons = GetClientButtons(i);
 		if (buttons & (IN_WALK | IN_BACK | IN_FORWARD | IN_RIGHT | IN_LEFT | IN_JUMP))
 		{
-			SDKHooks_TakeDamage(i, 0, 0, g_cvRLGLDamage.FloatValue);
-			SendHudText(i, sMessage, _, 1);
+			SDKHooks_TakeDamage(i, 0, 0, damage);
+			SendHudText(i, "STOP MOVING ITS A RED LIGHT!!!", _, 1);
 		}
 
 		continue;
@@ -273,20 +372,21 @@ Action RLGL_Detect_Timer(Handle timer)
 
 Action RLGL_Detect_Time_Timer(Handle timer)
 {
+	if (!THIS_MODE_INFO.isOn)
+		return Plugin_Stop;
+
 	ApplyFade("Green");
 	g_bEnableDetecting = false;
 	SetZombiesSpeed(1.0);
 	
 	delete g_hRLGLDetectTimer;
 	
-	char sMessage[256];
-	FormatEx(sMessage, sizeof(sMessage), "YOU CAN MOVE NOW, ITS A GREEN LIGHT!");
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_CT)
 			continue;
 
-		SendHudText(i, sMessage, _, 2);
+		SendHudText(i, "YOU CAN MOVE NOW, ITS A GREEN LIGHT!", _, 2);
 	}
 
 	return Plugin_Continue;
@@ -305,20 +405,59 @@ stock void SetZombiesSpeed(float val) {
 			thisVal = 1.0;
 
 		SetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue", thisVal); 
-		CPrintToChat(i, RLGL_Tag ... " Your speed has been changed to {olive}%.2f", thisVal); 
-		CPrintToChat(i, RLGL_Tag ... " This is a part of {olive}Red Light Green Light.{white} An admin decided to have this kicker.");
+		CPrintToChat(i, "%s Your speed has been changed to {olive}%.2f", THIS_MODE_INFO.tag, thisVal); 
+		CPrintToChat(i, "%s This is a part of {olive}Red Light Green Light.{white} An admin decided to have this kicker.", THIS_MODE_INFO.tag);
 	}
 }
 
 stock void StartRLGLTimer()
 {
 	float time = 10.0;
-	float timeMax = g_cvRLGLDetectTimerRepeatMax.FloatValue;
-	float timeMin = g_cvRLGLDetectTimerRepeatMin.FloatValue;
+	float timeMax = THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_TIME_BETWEEN_REDLIGHTS_MAX].cvar.FloatValue;
+	float timeMin = THIS_MODE_INFO.cvarInfo[RLGL_CONVAR_TIME_BETWEEN_REDLIGHTS_MIN].cvar.FloatValue;
 	if (timeMax <= 0.0) 
 		time = timeMin;
 	else
 		time = GetRandomFloat(timeMin, timeMax);
 		
-	g_hRLGLTimer 		= CreateTimer(time, RLGL_Timer, _, TIMER_FLAG_NO_MAPCHANGE);
+	g_hRLGLTimer = CreateTimer(time, RLGL_Timer, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+/* RLGL Settings */
+public Action Cmd_RLGLSettings(int client, int args)
+{
+	if (!client)
+		return Plugin_Handled;
+		
+	Menu menu = new Menu(Menu_RLGLSettings);
+
+	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+
+	menu.AddItem(NULL_STRING, "Show Cvars\n");
+
+	menu.ExitBackButton = true;
+	menu.Display(client, MENU_TIME_FOREVER);
+	return Plugin_Handled;
+}
+
+int Menu_RLGLSettings(Menu menu, MenuAction action, int param1, int param2)
+{
+	switch (action)
+	{
+		case MenuAction_End:
+			delete menu;
+		
+		case MenuAction_Cancel:
+		{
+			if (param2 == MenuCancel_ExitBack)
+				DisplayModeInfo(param1, g_iPreviousModeIndex[param1]);
+		}
+
+		case MenuAction_Select:
+		{
+			ShowCvarsInfo(param1, THIS_MODE_INFO);
+		}
+	}
+
+	return 0;
 }
