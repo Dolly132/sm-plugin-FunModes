@@ -30,7 +30,7 @@ stock void OnPluginStart_IC()
 		"sm_fm_ic"
 	};
 	
-	for(int i = 0; i < sizeof(commands); i++)
+	for (int i = 0; i < sizeof(commands); i++)
 	{
 		RegAdminCmd(commands[i], Cmd_ICToggle, ADMFLAG_CONVARS, "Enable/Disable Inverted controls");
 	}
@@ -105,13 +105,13 @@ public Action Cmd_ICToggle(int client, int args)
 	}
 
 	ConVar cvar = FindConVar("sv_accelerate");
-	if(cvar == null)
+	if (cvar == null)
 	{
 		// it should never happen though
 		return Plugin_Handled;
 	}
 	
-	if(cvar.IntValue == -5)
+	if (cvar.IntValue == -5)
 	{
 		CPrintToChatAll("%s Inverted Controls is now {olive}Off!", THIS_MODE_INFO.tag);
 		cvar.IntValue = 5;

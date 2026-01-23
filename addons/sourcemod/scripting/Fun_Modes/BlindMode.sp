@@ -222,7 +222,7 @@ void ApplyBlind(int client)
 	int time = THIS_MODE_INFO.cvarInfo[BLINDMODE_CONVAR_BLIND_TIME].cvar.IntValue;
 	
 	Handle message = StartMessage("Fade", clients, 1, 1);
-	if(GetUserMessageType() == UM_Protobuf)
+	if (GetUserMessageType() == UM_Protobuf)
 	{
 		Protobuf pb = UserMessageToProtobuf(message);
 		pb.SetInt("duration", time * 1000);
@@ -318,14 +318,14 @@ Action Timer_ApplyBlind(Handle timer, int ref)
 	
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if(!IsClientInGame(i) || !IsPlayerAlive(i) || !ZR_IsClientHuman(i))
+		if (!IsClientInGame(i) || !IsPlayerAlive(i) || !ZR_IsClientHuman(i))
 			continue;
 		
 		float plOrigin[3];
 		GetClientAbsOrigin(i, plOrigin);
 		
 		float distance = GetVectorDistance(origin, plOrigin);
-		if(distance > maxDistance)
+		if (distance > maxDistance)
 			continue;
 		
 		ApplyBlind(i);

@@ -124,7 +124,7 @@ public Action Cmd_DoubleJumpToggle(int client, int args)
 	CPrintToChatAll("%s Double Jump is now {olive}%s. %s", THIS_MODE_INFO.tag, (THIS_MODE_INFO.isOn) ? "Enabled" : "Disabled",
 													(THIS_MODE_INFO.isOn) ? "You can re-jump while you are in the air." : "");
 
-	if(THIS_MODE_INFO.isOn)
+	if (THIS_MODE_INFO.isOn)
 	{
 		CPrintToChatAll("%s Humans Double Jump: {olive}%s\n%s Zombies Double Jump: {olive}%s.", 
 						THIS_MODE_INFO.tag, (THIS_MODE_INFO.cvarInfo[DOUBLEJUMP_CONVAR_HUMANS].cvar.BoolValue) ? "Enabled" : "Disabled",
@@ -140,10 +140,10 @@ void OnPlayerRunCmdPost_DoubleJump(int client, int buttons, int impulse)
 	#pragma unused buttons
 	#pragma unused impulse
 	
-	if(!THIS_MODE_INFO.isOn || !IsClientInGame(client) || !IsPlayerAlive(client))
+	if (!THIS_MODE_INFO.isOn || !IsClientInGame(client) || !IsPlayerAlive(client))
 		return;
 
-	if((!THIS_MODE_INFO.cvarInfo[DOUBLEJUMP_CONVAR_HUMANS].cvar.BoolValue && GetClientTeam(client) == CS_TEAM_CT) || (!THIS_MODE_INFO.cvarInfo[DOUBLEJUMP_CONVAR_ZOMBIES].cvar.BoolValue && GetClientTeam(client) == CS_TEAM_T))
+	if ((!THIS_MODE_INFO.cvarInfo[DOUBLEJUMP_CONVAR_HUMANS].cvar.BoolValue && GetClientTeam(client) == CS_TEAM_CT) || (!THIS_MODE_INFO.cvarInfo[DOUBLEJUMP_CONVAR_ZOMBIES].cvar.BoolValue && GetClientTeam(client) == CS_TEAM_T))
 		return;
 
 	static bool inGround;
@@ -154,17 +154,17 @@ void OnPlayerRunCmdPost_DoubleJump(int client, int buttons, int impulse)
 	inGround 	= !!(GetEntityFlags(client) & FL_ONGROUND);
 	inJump 		= !!(GetClientButtons(client) & IN_JUMP);
 
-	if(!landed[client])
+	if (!landed[client])
 	{
-		if(THIS_MODE_INFO.cvarInfo[DOUBLEJUMP_CONVAR_MAX_JUMPS].cvar.IntValue)
+		if (THIS_MODE_INFO.cvarInfo[DOUBLEJUMP_CONVAR_MAX_JUMPS].cvar.IntValue)
 		{
 			static int jumps[MAXPLAYERS+1];
-			if(inGround)
+			if (inGround)
 				jumps[client] = 0;
-			else if(!wasJump[client] && inJump && jumps[client]++ <= THIS_MODE_INFO.cvarInfo[DOUBLEJUMP_CONVAR_MAX_JUMPS].cvar.IntValue)
+			else if (!wasJump[client] && inJump && jumps[client]++ <= THIS_MODE_INFO.cvarInfo[DOUBLEJUMP_CONVAR_MAX_JUMPS].cvar.IntValue)
 				ApplyNewJump(client);
 		}
-		else if(!inGround && !wasJump[client] && inJump)
+		else if (!inGround && !wasJump[client] && inJump)
 		{
 			ApplyNewJump(client);
 		}			

@@ -103,11 +103,11 @@ stock void Event_RoundStart_Fog()
 	if (!THIS_MODE_INFO.isOn)
 		return;
 	
-	if(IsValidEntity(g_iFogEntity))
+	if (IsValidEntity(g_iFogEntity))
 	{
-		for(int i = 1; i <= MaxClients; i++)
+		for (int i = 1; i <= MaxClients; i++)
 		{
-			if(!IsClientInGame(i))
+			if (!IsClientInGame(i))
 				continue;
 
 			SetVariantString("fog_mode_aaa34124n");
@@ -139,7 +139,7 @@ stock void Event_PlayerDeath_Fog(int client)
 Action PlayerSpawn_Timer(Handle timer, int userid)
 {
 	int client = GetClientOfUserId(userid);
-	if(client < 1 || !THIS_MODE_INFO.isOn)
+	if (client < 1 || !THIS_MODE_INFO.isOn)
 		return Plugin_Stop;
 
 	SetVariantString("fog_mode_aaa34124n");
@@ -153,7 +153,7 @@ stock void CreateFogEntity()
 	int entity = -1;
 	while((entity = FindEntityByClassname(entity, "env_fog_controller")) != -1)
 	{
-		if(entity == g_iFogEntity)
+		if (entity == g_iFogEntity)
 			continue;
 
 		AcceptEntityInput(entity, "TurnOff");
@@ -162,11 +162,11 @@ stock void CreateFogEntity()
 	char sColor[64];
 	Format(sColor, sizeof(sColor), "%i %i %i %i", g_FogData.fogColor[0], g_FogData.fogColor[1], g_FogData.fogColor[2], g_FogData.fogColor[3]);
 	
-	if(IsValidEntity(g_iFogEntity))
+	if (IsValidEntity(g_iFogEntity))
 		return;
 	
 	g_iFogEntity = CreateEntityByName("env_fog_controller");
-	if(!IsValidEntity(g_iFogEntity))
+	if (!IsValidEntity(g_iFogEntity))
 		return;
 	
 	DispatchKeyValue(g_iFogEntity, "targetname", "fog_mode_aaa34124n");
@@ -181,9 +181,9 @@ stock void CreateFogEntity()
 	DispatchSpawn(g_iFogEntity);
 	AcceptEntityInput(g_iFogEntity, "TurnOn");
 	
-	for(int i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 	{
-		if(!IsClientInGame(i))
+		if (!IsClientInGame(i))
 			continue;
 
 		SetVariantString("fog_mode_aaa34124n");
@@ -193,7 +193,7 @@ stock void CreateFogEntity()
 
 stock void AcceptFogInput(int mode)
 {
-	if(!IsValidEntity(g_iFogEntity))
+	if (!IsValidEntity(g_iFogEntity))
 		return;
 
 	switch(mode)
@@ -219,7 +219,7 @@ stock void AcceptFogInput(int mode)
 		case FOGInput_Toggle:
 		{
 			bool isOn = THIS_MODE_INFO.isOn;
-			if(isOn)
+			if (isOn)
 				AcceptEntityInput(g_iFogEntity, "TurnOn");
 			else
 				AcceptEntityInput(g_iFogEntity, "TurnOff");
@@ -264,7 +264,7 @@ public int FogSettings_Handler(Menu menu, MenuAction action, int param1, int par
 				case 1:
 				{
 					bool isOn = THIS_MODE_INFO.isOn;
-					if(isOn)
+					if (isOn)
 					{
 						CPrintToChat(param1, "%s %T", THIS_MODE_INFO.tag, "Fog_Disabled", param1);
 						CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, false, THIS_MODE_INFO.index);
@@ -291,7 +291,7 @@ stock void Fog_DisplayColorsMenu(int client)
 
 	/* TO GET FOG COLOR */
 	char colorName[64];
-	for(int i = 0; i < sizeof(g_ColorsList); i++)
+	for (int i = 0; i < sizeof(g_ColorsList); i++)
 	{
 		char buffers[3][5];
 		ExplodeString(g_ColorsList[i].rgb, " ", buffers, 3, sizeof(buffers[]));
@@ -308,7 +308,7 @@ stock void Fog_DisplayColorsMenu(int client)
 		fogColor[2] = g_FogData.fogColor[2];
 		fogColor[3] = g_FogData.fogColor[3];
 
-		if(fogColor[0] == color[0] && fogColor[1] == color[1] && fogColor[2] == color[2] && fogColor[3] == color[3])
+		if (fogColor[0] == color[0] && fogColor[1] == color[1] && fogColor[2] == color[2] && fogColor[3] == color[3])
 		{
 			Format(colorName, sizeof(colorName), g_ColorsList[i].name);
 			break;
@@ -320,7 +320,7 @@ stock void Fog_DisplayColorsMenu(int client)
 	menu.SetTitle(title);
 
 	/* TO ADD ITEMS */
-	for(int i = 0; i < sizeof(g_ColorsList); i++)
+	for (int i = 0; i < sizeof(g_ColorsList); i++)
 	{
 		char index[3];
 		IntToString(i, index, sizeof(index));
@@ -341,7 +341,7 @@ public int FogColorsMenu_Handler(Menu menu, MenuAction action, int param1, int p
 		}
 		case MenuAction_Cancel:
 		{
-			if(param2 == MenuCancel_ExitBack)
+			if (param2 == MenuCancel_ExitBack)
 				Fog_DisplaySettingsMenu(param1);
 		}
 		case MenuAction_Select:
@@ -389,7 +389,7 @@ public Action Cmd_FogToggle(int client, int args)
 		return Plugin_Handled;
 	}
 
-	if(THIS_MODE_INFO.isOn)
+	if (THIS_MODE_INFO.isOn)
 	{
 		CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, false, THIS_MODE_INFO.index);
 		AcceptFogInput(FOGInput_Toggle);
@@ -409,7 +409,7 @@ public Action Cmd_FogToggle(int client, int args)
 
 Action Cmd_FogSettings(int client, int args)
 {
-	if(!client)
+	if (!client)
 		return Plugin_Handled;
 
 	Fog_DisplaySettingsMenu(client);
@@ -418,7 +418,7 @@ Action Cmd_FogSettings(int client, int args)
 
 public Action Cmd_FogStart(int client, int args)
 {
-	if(args < 1)
+	if (args < 1)
 	{
 		CReplyToCommand(client, "%s Usage: sm_fog_start <distance>", THIS_MODE_INFO.tag);
 		return Plugin_Handled;
@@ -428,13 +428,13 @@ public Action Cmd_FogStart(int client, int args)
 	GetCmdArg(1, arg, sizeof(arg));
 
 	int distance;
-	if(!StringToIntEx(arg, distance))
+	if (!StringToIntEx(arg, distance))
 	{
 		CReplyToCommand(client, "%s Invalid distance.", THIS_MODE_INFO.tag);
 		return Plugin_Handled;
 	}
 
-	if(distance == 0)
+	if (distance == 0)
 	{
 		CReplyToCommand(client, "%s Distance cannot be 0", THIS_MODE_INFO.tag);
 		return Plugin_Handled;
@@ -448,7 +448,7 @@ public Action Cmd_FogStart(int client, int args)
 	
 Action Cmd_FogEnd(int client, int args)
 {
-	if(args < 1)
+	if (args < 1)
 	{
 		CReplyToCommand(client, "%s Usage: sm_fog_end <distance>", THIS_MODE_INFO.tag);
 		return Plugin_Handled;
@@ -458,19 +458,19 @@ Action Cmd_FogEnd(int client, int args)
 	GetCmdArg(1, arg, sizeof(arg));
 
 	int distance;
-	if(!StringToIntEx(arg, distance))
+	if (!StringToIntEx(arg, distance))
 	{
 		CReplyToCommand(client, "%s Invalid distance.", THIS_MODE_INFO.tag);
 		return Plugin_Handled;
 	}
 
-	if(distance == 0)
+	if (distance == 0)
 	{
 		CReplyToCommand(client, "%s Distance cannot be 0", THIS_MODE_INFO.tag);
 		return Plugin_Handled;
 	}
 
-	if(distance < g_FogData.fogStart)
+	if (distance < g_FogData.fogStart)
 	{
 		CReplyToCommand(client, "%s End Distance has to be higher than Start one.", THIS_MODE_INFO.tag);
 		return Plugin_Handled;
