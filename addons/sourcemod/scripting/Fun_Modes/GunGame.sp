@@ -79,6 +79,9 @@ GunGame_Data g_GunGameData[MAXPLAYERS + 1];
 
 StringMap g_hGunGameWeaponsMap;
 
+ConVar g_cvZRRestrictPerPlayer;
+bool g_bZRRestrictPerPlayer;
+
 stock void OnPluginStart_GunGame()
 {
 	THIS_MODE_INFO.name = "GunGame";
@@ -160,6 +163,12 @@ stock void OnPluginStart_GunGame()
 	THIS_MODE_INFO.cvarInfo[GUNGAME_CONVAR_TOGGLE].cvar.AddChangeHook(OnGunGameModeToggle);
 }
 
+/* TODO: Move this to FunModes.sp */
+public void OnAllPluginsLoaded()
+{
+	g_cvZRRestrictPerPlayer = FindConVar("zr_weapons_restrict_perplayer");
+}
+
 void OnGunGameModeToggle(ConVar cvar, const char[] newValue, const char[] oldValue)
 {
 	if (THIS_MODE_INFO.isOn)
@@ -173,6 +182,11 @@ stock void OnMapEnd_GunGame()
 	
 	for (int i = 1; i <= MaxClients; i++)
 		g_GunGameData[i].rewardTimer = null;
+	
+	if (g_cvZRRestrictPerPlayer == null)
+		return;
+	
+	g_cvZRRestrictPerPlayer.BoolValue = g_bZRRestrictPerPlayer;
 }
 
 stock void OnClientPutInServer_GunGame(int client)
@@ -417,6 +431,12 @@ public Action Cmd_GunGameToggle(int client, int args)
 		return Plugin_Handled;
 	}
 
+	if (g_cvZRRestrictPerPlayer == null)
+	{
+		CReplyToCommand(client, "%s A convar dependecy is missing, cannot toggle this mode without it", THIS_MODE_INFO.tag);
+		return Plugin_Handled;
+	}
+
 	/* You can change whatever you want here */
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	
@@ -440,10 +460,14 @@ public Action Cmd_GunGameToggle(int client, int args)
 		}
 		
 		FunModes_RestartRound();
+
+		g_bZRRestrictPerPlayer = g_cvZRRestrictPerPlayer.BoolValue;
+		g_cvZRRestrictPerPlayer.BoolValue = true;
 	}
 	else
 	{
 		ZR_SetAllRestrictAll(false);
+		g_cvZRRestrictPerPlayer.BoolValue = g_bZRRestrictPerPlayer;
 	}
 	
 	return Plugin_Handled;

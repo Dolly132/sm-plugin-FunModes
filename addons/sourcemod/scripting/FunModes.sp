@@ -97,6 +97,12 @@ public void OnPluginEnd()
 		
 		OnClientDisconnect(i);
 	}
+
+	// TODO: Move this to GunGame.sp, the next version will clean this
+	if (g_cvZRRestrictPerPlayer == null)
+		return;
+
+	g_cvZRRestrictPerPlayer.BoolValue = g_bZRRestrictPerPlayer;
 }
 
 public void OnMapStart()
