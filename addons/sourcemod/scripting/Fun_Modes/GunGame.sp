@@ -192,14 +192,6 @@ stock void ZR_OnClientInfected_GunGame(int client)
 		
 	if (!g_bMotherZombie)
 	{
-		// restrict players from buying all weapons
-		ZR_SetAllRestrictAll(true);
-		
-		// allow players to buy the following weapons:
-		ZR_SetAllWeaponRestrict("knife", false);
-		ZR_SetAllWeaponRestrict("Projectile", false);
-		ZR_SetAllWeaponRestrict("Equipment", false);
-		
 		for (int i = 1; i <= MaxClients; i++)
 		{
 			if (!IsClientInGame(i) || !IsPlayerAlive(i) || !ZR_IsClientHuman(i))
