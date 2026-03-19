@@ -400,7 +400,7 @@ stock void OnTakeDamagePost_CrazyShop(int victim, int attacker, float damage)
 	}
 }
 
-stock void OnWeaponCanUse_CrazyShop(int client, int weapon, Action &result)
+stock void OnWeaponEquip_CrazyShop(int client, int weapon, Action &result)
 {
 	#pragma unused client
 	#pragma unused weapon

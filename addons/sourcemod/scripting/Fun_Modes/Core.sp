@@ -17,7 +17,7 @@ bool g_bEvent_WeaponFire;
 
 /* Client SDKHook Boolens */
 bool g_bSDKHook_OnTakeDamagePost[MAXPLAYERS + 1] = { false, ... };
-bool g_bSDKHook_WeaponCanUse[MAXPLAYERS + 1] =  { false, ... };
+bool g_bSDKHook_WeaponEquip[MAXPLAYERS + 1] =  { false, ... };
 bool g_bSDKHook_OnTakeDamage[MAXPLAYERS + 1] =  { false, ... };
 
 /* Round Checking Booleans */
@@ -204,7 +204,9 @@ these commented macros are not used for now
 		%1.%2 = %3; \
 		g_ModesInfo[%4] = %1
 
+/*
 #define FUNMODE_CONVAR(%1,%2) %1.cvarInfo[%2].cvar
+*/
 
 #define THIS_MODE_INFO
 

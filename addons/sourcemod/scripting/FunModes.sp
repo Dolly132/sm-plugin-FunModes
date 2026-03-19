@@ -97,12 +97,6 @@ public void OnPluginEnd()
 		
 		OnClientDisconnect(i);
 	}
-
-	// TODO: Move this to GunGame.sp, the next version will clean this
-	if (g_cvZRRestrictPerPlayer == null)
-		return;
-
-	g_cvZRRestrictPerPlayer.BoolValue = g_bZRRestrictPerPlayer;
 }
 
 public void OnMapStart()
@@ -130,7 +124,7 @@ public void OnClientDisconnect(int client)
 {
 	g_bSDKHook_OnTakeDamagePost[client] = false;
 	g_bSDKHook_OnTakeDamage[client] = false;
-	g_bSDKHook_WeaponCanUse[client] = false;
+	g_bSDKHook_WeaponEquip[client] = false;
 	DECLARE_FM_FORWARD_PARAM(OnClientDisconnect, client);
 }
 
@@ -186,11 +180,11 @@ Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, in
 	return result;
 }
 
-Action OnWeaponCanUse(int client, int weapon)
+Action OnWeaponEquip(int client, int weapon)
 {
 	Action result = Plugin_Continue;
 	
-	DECLARE_FM_FORWARD_PARAM3(OnWeaponCanUse, client, weapon, result);
+	DECLARE_FM_FORWARD_PARAM3(OnWeaponEquip, client, weapon, result);
 	
 	return result;
 }

@@ -187,7 +187,7 @@ stock void ApplyNewJump(int client)
 }
 
 /* DoubleJump Settings */
-public void Cmd_DoubleJumpSettings(int client)
+public Action Cmd_DoubleJumpSettings(int client, int args)
 {
 	Menu menu = new Menu(Menu_DoubleJumpSettings);
 
@@ -197,6 +197,7 @@ public void Cmd_DoubleJumpSettings(int client)
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
+	return Plugin_Handled;
 }
 
 int Menu_DoubleJumpSettings(Menu menu, MenuAction action, int param1, int param2)

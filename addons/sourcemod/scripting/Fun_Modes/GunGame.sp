@@ -33,10 +33,8 @@ ModeInfo g_GunGameInfo;
 #define GUNGAME_CONVAR_RIFLES_DAMAGE		3
 #define GUNGAME_CONVAR_M249_DAMAGE			4
 #define GUNGAME_CONVAR_SMOKEGRENADES_COUNT 	5
-#define GUNGAME_CONVAR_REWARD_GRAVITY		6
-#define GUNGAME_CONVAR_REWARD_SPEED			7
-#define GUNGAME_CONVAR_CHANGE_WEAPON		8
-#define GUNGAME_CONVAR_TOGGLE 				9
+#define GUNGAME_CONVAR_REWARD_SPEED			6
+#define GUNGAME_CONVAR_TOGGLE 				7
 
 static const char g_GunGameWeaponsList[][][] =
 {
@@ -60,27 +58,21 @@ enum struct GunGame_Data
 	int dealtDamage;
 	
 	bool completedCycle;
+	bool allowEquip;
 	
 	float originalSpeed;
-	float originalGravity;
 	
 	GunGame_Reward reward;
 	Handle rewardTimer;
 	
 	void ResetLevel()
 	{
-		this.dealtDamage = 0;
 		this.level[0] = 0;
 		this.level[1] = 0;
 	}
 }
 
 GunGame_Data g_GunGameData[MAXPLAYERS + 1];
-
-StringMap g_hGunGameWeaponsMap;
-
-ConVar g_cvZRRestrictPerPlayer;
-bool g_bZRRestrictPerPlayer;
 
 stock void OnPluginStart_GunGame()
 {
@@ -91,62 +83,50 @@ stock void OnPluginStart_GunGame()
 	/* THESE ARE THE STANDARD COMMANDS THAT ALL MODES SHOULD HAVE */
 	RegAdminCmd("sm_fm_gungame", Cmd_GunGameToggle, ADMFLAG_CONVARS, "Turn GunGame Mode On/Off");
 	RegAdminCmd("sm_gungame_settings", Cmd_GunGameSettings, ADMFLAG_CONVARS, "Open GunGame Sttings Menu");
-
+	
 	RegConsoleCmd("sm_gungame", Cmd_GunGame, "Get your original weapons");
 
 	/* CONVARS */
 	DECLARE_FM_CVAR(
 		THIS_MODE_INFO.cvarInfo, GUNGAME_CONVAR_PISTOLS_DAMAGE,
-		"sm_gungame_pistols_damage", "400", "The required damage needed for pistols to upgrade",
+		"sm_gungame_pistols_damage", "1200", "The required damage needed for pistols to upgrade",
 		("800,1000,1500,2000,2500"), "int"
 	);
 	
 	DECLARE_FM_CVAR(
 		THIS_MODE_INFO.cvarInfo, GUNGAME_CONVAR_SHOTGUNS_DAMAGE,
-		"sm_gungame_shotguns_damage", "900", "The required damage needed for shotguns to upgrade",
+		"sm_gungame_shotguns_damage", "2200", "The required damage needed for shotguns to upgrade",
 		("800,1000,1500,2000,2500"), "int"
 	);
 	
 	DECLARE_FM_CVAR(
 		THIS_MODE_INFO.cvarInfo, GUNGAME_CONVAR_SMGS_DAMAGE,
-		"sm_gungame_smgs_damage", "1800", "The required damage needed for smgs to upgrade",
+		"sm_gungame_smgs_damage", "4200", "The required damage needed for smgs to upgrade",
 		("800,1000,1500,2000,2500"), "int"
 	);
 	
 	DECLARE_FM_CVAR(
 		THIS_MODE_INFO.cvarInfo, GUNGAME_CONVAR_RIFLES_DAMAGE,
-		"sm_gungame_rifles_damage", "2400", "The required damage needed for rifles to upgrade",
+		"sm_gungame_rifles_damage", "3800", "The required damage needed for rifles to upgrade",
 		("800,1000,1500,2000,2500"), "int"
 	);
 	
 	DECLARE_FM_CVAR(
 		THIS_MODE_INFO.cvarInfo, GUNGAME_CONVAR_M249_DAMAGE,
-		"sm_gungame_m249_damage", "4000", "The required damage needed for m249 to finish the gungame cycle",
+		"sm_gungame_m249_damage", "8000", "The required damage needed for m249 to finish the gungame cycle",
 		("800,1000,1500,2000,2500"), "int"
 	);
 	
 	DECLARE_FM_CVAR(
 		THIS_MODE_INFO.cvarInfo, GUNGAME_CONVAR_SMOKEGRENADES_COUNT,
-		"sm_gungame_smokegrenades_reward", "2", "How many smokegrenades to give to the player when completing a cycle",
+		"sm_gungame_hegrenades_reward", "2", "How many smokegrenades to give to the player when completing a cycle",
 		("1,3,5,10,15"), "int"
-	);
-	
-	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, GUNGAME_CONVAR_REWARD_GRAVITY,
-		"sm_gungame_gravity_reward", "100.0", "How many seconds can the player keep their low gravity hold",
-		("20.0,30.0,40.0,60.0,80.0,100.0"), "float"
 	);
 	
 	DECLARE_FM_CVAR(
 		THIS_MODE_INFO.cvarInfo, GUNGAME_CONVAR_REWARD_SPEED,
 		"sm_gungame_speed_reward", "100.0", "How many seconds can the player keep their high speed hold",
 		("20.0,30.0,40.0,60.0,80.0,100.0"), "float"
-	);
-	
-	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, GUNGAME_CONVAR_CHANGE_WEAPON,
-		"sm_gungame_allow_change_weapon", "0", "Enable/Disable allowing players to change their weapon to lower level",
-		("0,1"), "bool"
 	);
 	
 	DECLARE_FM_CVAR(
@@ -163,12 +143,6 @@ stock void OnPluginStart_GunGame()
 	THIS_MODE_INFO.cvarInfo[GUNGAME_CONVAR_TOGGLE].cvar.AddChangeHook(OnGunGameModeToggle);
 }
 
-/* TODO: Move this to FunModes.sp */
-public void OnAllPluginsLoaded()
-{
-	g_cvZRRestrictPerPlayer = FindConVar("zr_weapons_restrict_perplayer");
-}
-
 void OnGunGameModeToggle(ConVar cvar, const char[] newValue, const char[] oldValue)
 {
 	if (THIS_MODE_INFO.isOn)
@@ -182,11 +156,6 @@ stock void OnMapEnd_GunGame()
 	
 	for (int i = 1; i <= MaxClients; i++)
 		g_GunGameData[i].rewardTimer = null;
-	
-	if (g_cvZRRestrictPerPlayer == null)
-		return;
-	
-	g_cvZRRestrictPerPlayer.BoolValue = g_bZRRestrictPerPlayer;
 }
 
 stock void OnClientPutInServer_GunGame(int client)
@@ -194,12 +163,13 @@ stock void OnClientPutInServer_GunGame(int client)
 	if (!THIS_MODE_INFO.isOn)
 		return;
 	
+	g_GunGameData[client].allowEquip = true;
 	g_GunGameData[client].ResetLevel();
 	
-	if (!g_bSDKHook_WeaponCanUse[client])
+	if (!g_bSDKHook_WeaponEquip[client])
 	{
-		SDKHook(client, SDKHook_WeaponCanUse, OnWeaponCanUse);
-		g_bSDKHook_WeaponCanUse[client] = true;
+		SDKHook(client, SDKHook_WeaponEquip, OnWeaponEquip);
+		g_bSDKHook_WeaponEquip[client] = true;
 	}
 	
 	if (!g_bSDKHook_OnTakeDamagePost[client])
@@ -212,37 +182,6 @@ stock void OnClientPutInServer_GunGame(int client)
 stock void OnClientDisconnect_GunGame(int client)
 {
 	delete g_GunGameData[client].rewardTimer;
-}
-
-public void EntWatch_OnPickUpItem(const char[] itemName, int client)
-{
-	if (!THIS_MODE_INFO.isOn)
-		return;
-		
-	ZR_SetClientWeaponRestrictAll(client, false);
-	CPrintToChat(client, "%s You have picked up an item, you can buy any weapon you want during gungame!", THIS_MODE_INFO.tag);
-}
-
-public void EntWatch_OnDropItem(const char[] itemName, int client)
-{
-	if (!THIS_MODE_INFO.isOn)
-		return;
-		
-	// restrict this player from buying all weapons
-	ZR_SetClientWeaponRestrictAll(client, true);
-		
-	// allow this player to buy the following weapons:
-	ZR_SetClientWeaponRestrict(client, "knife", false);
-	ZR_SetClientWeaponRestrict(client, "Projectile", false);
-	ZR_SetClientWeaponRestrict(client, "Equipment", false);
-	
-	if (IsPlayerAlive(client) && ZR_IsClientHuman(client))
-	{
-		int weaponType  = g_GunGameData[client].level[0];
-		int weaponIndex = g_GunGameData[client].level[1];
-	
-		GunGame_EquipWeapon(client, g_GunGameWeaponsList[weaponType][weaponIndex], true);
-	}
 }
 
 stock void ZR_OnClientInfected_GunGame(int client)
@@ -267,21 +206,22 @@ stock void ZR_OnClientInfected_GunGame(int client)
 				continue;
 			
 			if (EntWatch_HasSpecialItem(i))
-			{
-				ZR_SetClientWeaponRestrictAll(i, false);
 				continue;
-			}
-			
+
 			GunGame_ResetHuman(i);
 		}
-		
+
 		CPrintToChatAll("%s Your weapon will be upgraded when you reach the required damage for each weapon type!", THIS_MODE_INFO.tag);
 		CPrintToChatAll("%s Type {olive}!gungame {lightgreen}if you lost your weapons!", THIS_MODE_INFO.tag);
 	}
 }
 
 stock void Event_RoundStart_GunGame() {}
-stock void Event_RoundEnd_GunGame() {}
+stock void Event_RoundEnd_GunGame()
+{
+	for (int i = 1; i <= MaxClients; i++)
+		g_GunGameData[i].allowEquip = true;
+}
 
 stock void Event_PlayerSpawn_GunGame(int client)
 {
@@ -328,16 +268,7 @@ stock void OnTakeDamagePost_GunGame(int victim, int attacker, float damage)
 	if (EntWatch_HasSpecialItem(attacker))
 		return;
 		
-	char weapon[32];
-	GetClientWeapon(attacker, weapon, sizeof(weapon));
-	
-	int weaponType = g_GunGameData[attacker].level[0];
-	int weaponIndex = g_GunGameData[attacker].level[1];
-	
-	if (weaponType > 0 && strcmp(weapon, g_GunGameWeaponsList[weaponType][weaponIndex]) != 0)
-		return;
-		
-	int neededDamage = THIS_MODE_INFO.cvarInfo[weaponType].cvar.IntValue;
+	int neededDamage = THIS_MODE_INFO.cvarInfo[g_GunGameData[attacker].level[0]].cvar.IntValue;
 	
 	if (g_GunGameData[attacker].dealtDamage >= neededDamage)
 	{
@@ -349,69 +280,50 @@ stock void OnTakeDamagePost_GunGame(int victim, int attacker, float damage)
 	g_GunGameData[attacker].dealtDamage += RoundToNearest(damage);
 }
 
-stock void OnWeaponCanUse_GunGame(int client, int weapon, Action &result)
+stock void OnWeaponEquip_GunGame(int client, int weapon, Action &result)
 {
 	if (!THIS_MODE_INFO.isOn)
 		return;
-		
-	if (!g_bMotherZombie)
+	
+	if (!IsPlayerAlive(client) || ZR_IsClientZombie(client))
 		return;
 	
-	if (ZR_IsClientZombie(client))
+	char className[32];
+	GetEntityClassname(weapon, className, sizeof(className));
+
+	// kevlar, hegrenades and smokegrenades:
+	if (StrContains(className, "item_", false) != -1 || StrContains(className, "grenade", false) != -1)
 		return;
-		
+	
+	// flashbang
+	if (className[7] == 'f' && className[8] == 'l')
+		return;
+
 	if (EntWatch_IsSpecialItem(weapon))
 		return;
-	
-	if (EntWatch_HasSpecialItem(client))
-		return;
-			
-	char weaponName[32];
-	GetEntityClassname(weapon, weaponName, sizeof(weaponName));
 
-	int weaponType = g_GunGameData[client].level[0];
-	int weaponIndex = g_GunGameData[client].level[1];
-	if (GunGame_CanUseWeapon(weaponType, weaponIndex, weaponName))
+	if (!g_GunGameData[client].allowEquip)
+	{
+		result = Plugin_Handled;
 		return;
-		
-	result = Plugin_Handled;
+	}
 }
 
-stock bool GunGame_CanUseWeapon(int weaponType, int weaponIndex, const char[] weaponName)
+public Action CS_OnBuyCommand(int client, const char[] weapon)
 {
-	if (g_hGunGameWeaponsMap == null)
+	if (!THIS_MODE_INFO.isOn)
+		return Plugin_Continue;
+		
+	if (EntWatch_HasSpecialItem(client))
+		return Plugin_Continue;
+
+	if (!g_GunGameData[client].allowEquip)
 	{
-		g_hGunGameWeaponsMap = new StringMap();
-		for (int i = 0; i < sizeof(g_GunGameWeaponsList); i++)
-		{
-			for (int j = 0; j < sizeof(g_GunGameWeaponsList[]); j++)
-			{
-				if (g_GunGameWeaponsList[i][j][0] == '\0')
-					continue;
-				
-				g_hGunGameWeaponsMap.SetValue(g_GunGameWeaponsList[i][j], i * sizeof(g_GunGameWeaponsList[]) + j);
-			}
-		}
+		CPrintToChat(client, "%s You cannot buy/equip weapons during GunGame Escape Mode", THIS_MODE_INFO.tag);
+		return Plugin_Stop;
 	}
 	
-	int thisVal;
-	if (!g_hGunGameWeaponsMap.GetValue(weaponName, thisVal))
-		return true;
-	
-	int curVal = weaponType * sizeof(g_GunGameWeaponsList[]) + weaponIndex;
-	if (THIS_MODE_INFO.cvarInfo[GUNGAME_CONVAR_CHANGE_WEAPON].cvar.BoolValue)
-		return (thisVal <= curVal);
-	
-	if (weaponType > 0 && thisVal <= 5)
-		return true;
-	
-	if (weaponType == 0 && thisVal <= 1)
-		return true;
-		
-	if (curVal == thisVal)
-		return true;
-		
-	return false;
+	return Plugin_Continue;
 }
 
 stock void GunGame_ResetHuman(int client)
@@ -431,16 +343,12 @@ public Action Cmd_GunGameToggle(int client, int args)
 		return Plugin_Handled;
 	}
 
-	if (g_cvZRRestrictPerPlayer == null)
-	{
-		CReplyToCommand(client, "%s A convar dependecy is missing, cannot toggle this mode without it", THIS_MODE_INFO.tag);
-		return Plugin_Handled;
-	}
-
 	/* You can change whatever you want here */
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	
 	CPrintToChatAll("%s GunGame Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	
+	static bool cvarsValues[2];
 	
 	if (THIS_MODE_INFO.isOn)
 	{
@@ -461,13 +369,37 @@ public Action Cmd_GunGameToggle(int client, int args)
 		
 		FunModes_RestartRound();
 
-		g_bZRRestrictPerPlayer = g_cvZRRestrictPerPlayer.BoolValue;
-		g_cvZRRestrictPerPlayer.BoolValue = true;
+		ConVar cvar = FindConVar("zr_weapons_zmarket_rebuy");
+		if (cvar != null)
+		{
+			cvarsValues[0] = cvar.BoolValue;
+			cvar.BoolValue = false;
+			delete cvar;
+		}
+		
+		cvar = FindConVar("zr_weapons_zmarket");
+		if (cvar != null)
+		{
+			cvarsValues[1] = cvar.BoolValue;
+			cvar.BoolValue = false;
+			delete cvar;
+		}
 	}
 	else
 	{
-		ZR_SetAllRestrictAll(false);
-		g_cvZRRestrictPerPlayer.BoolValue = g_bZRRestrictPerPlayer;
+		ConVar cvar = FindConVar("zr_weapons_zmarket_rebuy");
+		if (cvar != null)
+		{
+			cvar.BoolValue = cvarsValues[0];
+			delete cvar;
+		}
+		
+		cvar = FindConVar("zr_weapons_zmarket");
+		if (cvar != null)
+		{
+			cvar.BoolValue = cvarsValues[1];
+			delete cvar;
+		}
 	}
 	
 	return Plugin_Handled;
@@ -482,8 +414,8 @@ public Action Cmd_GunGameSettings(int client, int args)
 	Menu menu = new Menu(Menu_GunGameSettings);
 
 	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
-	
-	menu.AddItem(NULL_STRING, "Show Cvars\n ");
+
+	menu.AddItem(NULL_STRING, "Show Cvars\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -545,7 +477,8 @@ Action Cmd_GunGame(int client, int args)
 			GunGame_EquipWeapon(client, g_GunGameWeaponsList[0][0], true);
 	}
 	
-	GunGame_EquipWeapon(client, g_GunGameWeaponsList[weaponType][weaponIndex], weaponType > 0);
+	GunGame_EquipWeapon(client, g_GunGameWeaponsList[weaponType][weaponIndex], true);
+	
 	return Plugin_Handled;
 }
 
@@ -554,23 +487,14 @@ void GunGame_GiveWeapon(int client)
 	int weaponType = g_GunGameData[client].level[0];
 	int weaponIndex = g_GunGameData[client].level[1];
 	
-	bool canUsePrevious = THIS_MODE_INFO.cvarInfo[GUNGAME_CONVAR_CHANGE_WEAPON].cvar.BoolValue;
-	if (canUsePrevious)
-	{
-		char thisWeapon[32];
-		strcopy(thisWeapon, sizeof(thisWeapon), g_GunGameWeaponsList[weaponType][weaponIndex]);
-		ReplaceString(thisWeapon, sizeof(thisWeapon), "weapon_", "");
-		ZR_SetClientWeaponRestrict(client, thisWeapon, false);
-	}
-	
 	/* If weapon type is still pistols */
 	if (weaponType == 0)
 	{
 		int secondary = GetPlayerWeaponSlot(client, CS_SLOT_SECONDARY);
 		if (!IsValidEntity(secondary))
 		{
-			g_GunGameData[client].level[0] = 0; g_GunGameData[client].level[1] = 0;
 			GunGame_EquipWeapon(client, g_GunGameWeaponsList[0][0]);
+			g_GunGameData[client].level[0] = 0; g_GunGameData[client].level[1] = 0;
 			return;
 		}
 		
@@ -583,8 +507,8 @@ void GunGame_GiveWeapon(int client)
 		{
 			if (weaponIndex == 0)
 			{
-				g_GunGameData[client].level[1] = 1;
 				GunGame_EquipWeapon(client, hasGlock ? "weapon_usp" : "weapon_glock");
+				g_GunGameData[client].level[1] = 1;
 				return;
 			}
 		}
@@ -608,33 +532,31 @@ void GunGame_GiveWeapon(int client)
 	g_GunGameData[client].level[0] = weaponType;
 	g_GunGameData[client].level[1] = weaponIndex;
 	
-	if (canUsePrevious)
-	{
-		char thisWeapon[32];
-		strcopy(thisWeapon, sizeof(thisWeapon), g_GunGameWeaponsList[weaponType][weaponIndex]);
-		ReplaceString(thisWeapon, sizeof(thisWeapon), "weapon_", "");
-		ZR_SetClientWeaponRestrict(client, thisWeapon, false);
-	}
-	
 	GunGame_EquipWeapon(client, g_GunGameWeaponsList[weaponType][weaponIndex], weaponType > 0);
 }
 
 void GunGame_EquipWeapon(int client, const char[] weaponName, bool keepSecondary = false)
 {
-	GunGame_StripPlayer(client, keepSecondary);
 	int weapon = GivePlayerItem(client, weaponName);
 	if (!IsValidEntity(weapon))
 		return;
 	
+	GunGame_StripPlayer(client, keepSecondary);
+	
+	g_GunGameData[client].allowEquip = true;
+	EquipPlayerWeapon(client, weapon);
+
 	if (g_hSwitchSDKCall != null)
 		SDKCall(g_hSwitchSDKCall, client, weapon, 0);
+
+	g_GunGameData[client].allowEquip = false;
 }
 
 void GunGame_StripPlayer(int client, bool keepSecondary = false, bool giveSecondary = false)
 {
 	for (int i = 0; i <= 5; i++)
 	{
-		if (i == CS_SLOT_KNIFE || i == CS_SLOT_GRENADE)
+		if (i != CS_SLOT_SECONDARY && i != CS_SLOT_PRIMARY)
 			continue;
 			
 		if (keepSecondary && i == CS_SLOT_SECONDARY)
@@ -649,7 +571,7 @@ void GunGame_StripPlayer(int client, bool keepSecondary = false, bool giveSecond
 			continue;
 		}
 		
-		RemovePlayerItem(client, wp);
+		SDKHooks_DropWeapon(client, wp);
 		RemoveEntity(wp);
 	}
 }

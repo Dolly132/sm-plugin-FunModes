@@ -154,7 +154,7 @@ stock void OnTakeDamagePost_DamageGame(int victim, int attacker, float damage)
 	g_iDealtDamage[attacker] += RoundToNearest(damage);
 }
 
-stock void OnWeaponCanUse_DamageGame(int client, int weapon, Action &result)
+stock void OnWeaponEquip_DamageGame(int client, int weapon, Action &result)
 {
 	#pragma unused client
 	#pragma unused weapon
