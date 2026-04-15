@@ -190,7 +190,7 @@ public Action Cmd_DamageGameToggle(int client, int args)
 			OnClientPutInServer_DamageGame(i);
 		}
 		
-		CS_TerminateRound(3.0, CSRoundEnd_Draw);
+		FunModes_RestartRound();
 	}
 	else
 	{
